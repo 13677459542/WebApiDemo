@@ -2,8 +2,12 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using Newtonsoft.Json;
+using Serilog;
+using Serilog.Events;
+using Serilog.Formatting.Compact;
 using System.Text;
 using WebApiDemo.Utils;
+using WebApiDemo.Utils.LogMiddleware;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -26,6 +30,83 @@ builder.Services.AddCors(options =>
 
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddHttpClient();
+
+#region 配置Serilog日志
+//日志目录
+string infoPath = Directory.GetCurrentDirectory() + @"\Logs\info\.log"; ;
+string waringPath = Directory.GetCurrentDirectory() + @"\Logs\waring\.log";
+string errorPath = Directory.GetCurrentDirectory() + @"\Logs\error\.log";
+string fatalPath = Directory.GetCurrentDirectory() + @"\Logs\fatal\.log";
+string template = "{NewLine}时间:{Timestamp:yyyy-MM-dd HH:mm:ss.fff}{NewLine}等级:{Level}{NewLine}来源:{SourceContext}{NewLine}具体消息如下:{Message}{NewLine}{Exception}";
+// 配置Serilog
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Warning) // 排除Microsoft的日志
+    .Enrich.FromLogContext() // 注册日志上下文
+    .WriteTo.Console(new CompactJsonFormatter()) // 输出到控制台
+    .Enrich.FromLogContext()
+    .WriteTo.Logger(lg => lg.Filter.ByIncludingOnly(lev => lev.Level == LogEventLevel.Information).
+     WriteTo.Async(congfig => congfig.File(
+               infoPath,
+               rollingInterval: RollingInterval.Day,
+               fileSizeLimitBytes: 1024 * 1024 * 10,//默認1GB
+               retainedFileCountLimit: 10,//保留最近多少個文件  默認31個
+               rollOnFileSizeLimit: true,//超過文件大小時 自動創建新文件  
+               shared: true,
+               outputTemplate: template)
+     ))
+     .WriteTo.Logger(lg => lg.Filter.ByIncludingOnly(lev => lev.Level == LogEventLevel.Warning).
+     WriteTo.Async(congfig => congfig.File(
+               waringPath,
+               rollingInterval: RollingInterval.Day,
+               fileSizeLimitBytes: 1024 * 1024 * 10,
+               retainedFileCountLimit: 10,
+               rollOnFileSizeLimit: true,
+               shared: true,
+               outputTemplate: template)
+     ))
+    .WriteTo.Logger(lg => lg.Filter.ByIncludingOnly(lev => lev.Level == LogEventLevel.Error).
+     WriteTo.Async(congfig => congfig.File(
+               errorPath,
+               rollingInterval: RollingInterval.Day,
+               fileSizeLimitBytes: 1024 * 1024 * 10,
+               retainedFileCountLimit: 10,
+               rollOnFileSizeLimit: true,
+               shared: true,
+               outputTemplate: template)
+     ))
+     .WriteTo.Logger(lg => lg.Filter.ByIncludingOnly(lev => lev.Level == LogEventLevel.Fatal).
+     WriteTo.Async(congfig => congfig.File(
+               fatalPath,
+               rollingInterval: RollingInterval.Day,
+               fileSizeLimitBytes: 1024 * 1024 * 10,
+               retainedFileCountLimit: 10,
+               rollOnFileSizeLimit: true,
+               shared: true,
+               outputTemplate: template)
+     ))
+     .WriteTo.Logger(lg => lg.Filter.ByIncludingOnly(lev => lev.Level == LogEventLevel.Debug).
+     WriteTo.Async(congfig => congfig.File(
+               fatalPath,
+               rollingInterval: RollingInterval.Day,
+               fileSizeLimitBytes: 1024 * 1024 * 10,
+               retainedFileCountLimit: 10,
+               rollOnFileSizeLimit: true,
+               shared: true,
+               outputTemplate: template)
+     ))
+      .WriteTo.Logger(lg => lg.Filter.ByIncludingOnly(lev => lev.Level == LogEventLevel.Verbose).
+     WriteTo.Async(congfig => congfig.File(
+               fatalPath,
+               rollingInterval: RollingInterval.Day,
+               fileSizeLimitBytes: 1024 * 1024 * 10,
+               retainedFileCountLimit: 10,
+               rollOnFileSizeLimit: true,
+               shared: true,
+               outputTemplate: template)
+     ))
+.CreateLogger();
+builder.Host.UseSerilog();
+#endregion
 
 #region JWT验证
 // 1、安装包：Microsoft.AspNetCore.Authentication.JwtBearer
@@ -128,9 +209,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
-//app.UseRequestResponseLogging();
+app.UseRequestResponseLogging();// 使用日志中间件
 app.UseCors();
-app.UseHttpsRedirection();
+//app.UseHttpsRedirection();
 app.UseAuthentication();// 启用JWT Token认证 注意顺序一定是先认证(UseAuthentication)后授权(UseAuthorization) 不然接口即使附加token也认证不通过
 app.UseAuthorization();
 
