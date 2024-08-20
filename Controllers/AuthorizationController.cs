@@ -1,6 +1,7 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Newtonsoft.Json;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
 using WebApiDemo.Model.Resp;
@@ -50,21 +51,41 @@ namespace WebApiDemo.Controllers
 
 
         /// <summary>
-        /// 密码明文RSA SHA256 加密
+        /// 密码明文RSA2 SHA256 加密
         /// </summary>
         /// <param name="req"></param>
         /// <returns></returns>
         [HttpPost, AllowAnonymous]// AllowAnonymous：允许匿名访问
         public BaseResp<string> GetRSAPwd(string req)
         {
-            BaseResp<string> resp = new();
-            resp.ResultCode = 1;
-            resp.ResultMsg = "失败";
+            //BaseResp<string> resp = new();
+            //resp.ResultCode = 1;
+            //resp.ResultMsg = "失败";
             try
             {
                 var rsa = new RSAHelper(RSAType.RSA2, Encoding.UTF8, privateKey, publicKey);
                 var pwd = rsa.Encrypt(req);
                 return ApiResult.SetSuccess<string>("加密成功", pwd);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult.SetFailure(ex.Message, "");
+            }
+        }
+
+        // <summary>
+        /// 数据签名
+        /// </summary>
+        /// <param name="req"></param>
+        /// <returns></returns>
+        [HttpPost, AllowAnonymous]// AllowAnonymous：允许匿名访问
+        public BaseResp<string> GetSign(string req)
+        {
+            try
+            {
+                var rsa = new RSAHelper(RSAType.RSA2, Encoding.UTF8, privateKey, publicKey);
+                var pwd = rsa.Sign(req);
+                return ApiResult.SetSuccess<string>("签名成功", pwd);
             }
             catch (Exception ex)
             {
@@ -85,29 +106,26 @@ namespace WebApiDemo.Controllers
             resp.ResultMsg = "账号/密码错误";
             try
             {
-                //WxPayData wx = new WxPayData(_logger);
-                //wx.SetValue("userName", req.UserName);
-                //wx.SetValue("pwd", req.Pwd);
-                //wx.SetValue("nonce_str", req.nonce_str);
+                var rsa = new RSAHelper(RSAType.RSA2, Encoding.UTF8, privateKey, publicKey);
 
-                //var localSign = wx.MakeSignForGetToken();
                 //string? headerSign = _httpContextAccessor?.HttpContext?.Request.Headers["sign"].FirstOrDefault();
                 //if (string.IsNullOrEmpty(headerSign))
                 //    return ApiResult.SetFailure("签名不能为空!", "");
-
-                //if (localSign != headerSign)
+                //if (rsa.Verify(JsonConvert.SerializeObject(req), headerSign))
                 //    return ApiResult.SetFailure("签名验证不通过", "");
 
-                var rsa = new RSAHelper(RSAType.RSA2, Encoding.UTF8, privateKey, publicKey);
                 var pwd = rsa.Decrypt(req.Pwd);
-
                 if (req.UserName != "admin" || pwd != "123456")
                     return ApiResult.SetFailure("账号/密码错误", "");
 
-                TokenModelJwt model = new TokenModelJwt();
-                model.UserId = 1;
-                model.Role = "admin";
-                model.UserName = "admin";
+                TokenModelJwt model = new TokenModelJwt()
+                {
+                    UserId = 1,
+                    Role = "admin,doctor,test",//可以同时赋值多个角色
+                    UserName = "admin",
+                    NickName = "管理员",
+                    Description = "管理员获取令牌",
+                };
                 return ApiResult.SetSuccess<string>("获取Token成功", _jwtHelper.CreateToken(model));
             }
             catch (Exception ex)

@@ -5,7 +5,8 @@ namespace WebApiDemo.Utils
 {
     /// <summary>
     /// //RSA加解密 使用OpenSSL的公钥加密/私钥解密
-    /// RSA2密钥对获取：1、下载支付宝开放平台密钥工具，生成密钥后获得公钥私钥。2、将私钥在格式转换中转换成PKCS1格式，获得转换后的私钥。地址：https://opendocs.alipay.com/mini/02c7i5
+    /// RSA2密钥对获取（通过支付宝开放平台密钥工具）：1、下载支付宝开放平台密钥工具，生成密钥后获得公钥私钥。2、将私钥在格式转换中转换成PKCS1格式，获得转换后的私钥。地址：https://opendocs.alipay.com/mini/02c7i5
+    /// RSA2密钥对获取（通过其他渠道生成）：1、生成密钥后获得公钥私钥。2、将私钥在支付宝开放平台密钥工具格式转换中转换成PKCS1格式，获得转换后的私钥。
     /// 在线加密测试地址：https://www.json.cn/encrypt/rsa/#google_vignette
     /// </summary>
     public class RSAHelper
@@ -26,14 +27,10 @@ namespace WebApiDemo.Utils
         {
             _encoding = encoding;
             if (!string.IsNullOrEmpty(privateKey))
-            {
                 _privateKeyRsaProvider = CreateRsaProviderFromPrivateKey(privateKey);
-            }
 
             if (!string.IsNullOrEmpty(publicKey))
-            {
                 _publicKeyRsaProvider = CreateRsaProviderFromPublicKey(publicKey);
-            }
 
             _hashAlgorithmName = rsaType == RSAType.RSA ? HashAlgorithmName.SHA1 : HashAlgorithmName.SHA256;
         }
