@@ -29,9 +29,9 @@ builder.Services.AddCors(options =>
     {
         builder.WithOrigins("*") // 替换为允许访问的域名，*代表允许所有域请求
                .AllowAnyMethod()
-               .AllowAnyHeader();
-        //.AllowAnyOrigin()
-        //.AllowCredentials();
+               .AllowAnyHeader()
+               .AllowAnyOrigin()
+               .AllowCredentials();
     });
 });
 

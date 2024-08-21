@@ -51,6 +51,7 @@ namespace WebApiDemo.Controllers
         /// <param name="req"></param>
         /// <returns></returns>
         [HttpPost]
+        //[CustomCorsActionFilterAttribute] // 标记该方法支持跨域请求
         [ApiExplorerSettings(GroupName = nameof(ApiVersioninfo.WebApiDemo_V1))]
         public BaseResp<string> Test1(string req)
         {
@@ -91,6 +92,25 @@ namespace WebApiDemo.Controllers
         public BaseResp<string> GetJSONPCrossDaminDataNoParaameeter()
         {
             return ApiResult.SetSuccess<string>("获取成功", "请求成功！");
+        }
+
+        /// <summary>
+        /// 获取图片转文件流并输出
+        /// </summary>
+        /// <returns></returns>
+        [HttpGet, AllowAnonymous]
+        public async Task<IActionResult> GetImageStream()
+        {
+            MemoryStream stream;
+            using(FileStream fs =new FileStream("Images/banner.png", FileMode.Open))
+            {
+                int len = (int)fs.Length;
+                byte[] buf = new byte[len];
+                fs.Read(buf, 0, len);
+                stream = new MemoryStream();
+                stream.Write(buf, 0, len);
+            }
+            return await Task.FromResult<FileResult>(File(stream.ToArray(),"image/gif"));
         }
     }
 }
