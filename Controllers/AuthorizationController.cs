@@ -4,9 +4,14 @@ using Microsoft.AspNetCore.Mvc;
 using Newtonsoft.Json;
 using System.IdentityModel.Tokens.Jwt;
 using System.Text;
+using System.Text.RegularExpressions;
+using WebApiDemo.Model;
 using WebApiDemo.Model.Resp;
 using WebApiDemo.Utils;
 using WebApiDemo.Utils.Model;
+using System.Net.Mail;
+using MimeKit;
+using MailKit.Net.Smtp;
 
 namespace WebApiDemo.Controllers
 {
@@ -131,6 +136,98 @@ namespace WebApiDemo.Controllers
             catch (Exception ex)
             {
                 return ApiResult.SetFailure(ex.Message, "");
+            }
+        }
+
+        /// <summary>
+        /// 定义字典存放验证码，建议存放至Redis或数据库中
+        /// </summary>
+        private readonly static Dictionary<string, int> _maildate = new();
+        /// <summary>
+        /// 发送邮箱验证码
+        /// </summary>
+        /// <param name="_mail"></param>
+        /// <param name="mails"></param>
+        /// <returns></returns>
+        [HttpPost, AllowAnonymous]// AllowAnonymous：允许匿名访问
+        public BaseResp<string> PostEmails([FromBody] Mail mails)
+        {
+            try
+            {
+                string SendMessage = ""; // 接收发送的返回值
+
+                //如果字典中有该邮箱对应的验证码则删除
+                if (_maildate.ContainsKey(mails.recipientArry))
+                {
+                    _maildate.Remove(mails.recipientArry);
+                }
+                //设置邮箱正则表达式
+                string emailPattern = @"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$";
+                Regex regeemail = new Regex(emailPattern);
+                if (!regeemail.IsMatch(mails.recipientArry)) return ApiResult.SetFailure("收件人邮箱地址格式错误", "");
+               
+                // 创建邮件消息
+                var message = new MimeMessage();
+                message.From.Add(new MailboxAddress("Your Name", mails.fromPerson)); // 发件人邮箱
+                message.To.Add(new MailboxAddress("Recipient Name", mails.recipientArry)); // 收件人邮箱
+                message.Subject = mails.mailTitle; // 标题
+
+                //生成四位验证码
+                int randomNumber = new Random().Next(1000, 10000);
+                //账户与验证码存放在字典中
+                if (!string.IsNullOrWhiteSpace(mails.recipientArry))
+                {
+                    _maildate[mails.recipientArry] = randomNumber;
+                }
+
+                if (mails.isbodyHtml)
+                {
+                    // 添加 HTML 格式的邮件正文
+                    message.Body = new TextPart("html")
+                    {
+                        Text = $"<h1>{mails.mailTitle}</h1><p>你好，你的验证码为：{randomNumber}</p>"
+                    };
+                }
+                else
+                {
+                    // 添加邮件正文
+                    message.Body = new TextPart("plain")
+                    {
+                        Text = "你好，你的验证码为：" + randomNumber.ToString()
+                    };
+                }
+
+                //截取发件人邮箱地址从而判断Smtp的值
+                string[] sArray = mails.fromPerson.Split(new char[2] { '@', '.' });
+                if (sArray[1] == "qq")
+                {
+                    mails.host = "smtp.qq.com";//如果是QQ邮箱则：smtp.qq.com
+                    // 连接到 QQ 邮箱的 SMTP 服务器并发送邮件
+                    using (var client = new MailKit.Net.Smtp.SmtpClient())
+                    {
+                        client.Connect(mails.host, 465, true); // 使用 SSL 连接到 QQ 邮箱的 SMTP 服务器
+                        client.Authenticate(mails.fromPerson, mails.code); // 使用 QQ 邮箱的授权码进行身份验证
+                        SendMessage = client.Send(message); //发送邮件并接收返回值
+                        client.Disconnect(true);
+                    }
+                }
+                else
+                {
+                    //// 连接到 SMTP 服务器并发送邮件
+                    //using (var client = new MailKit.Net.Smtp.SmtpClient())
+                    //{
+                    //    client.Connect("smtp.example.com", 587, false); // 用你的 SMTP 服务器信息替换
+                    //    client.Authenticate("your-email@example.com", "your-password"); // 用你的邮箱账号和密码替换
+                    //    client.Send(message);
+                    //    client.Disconnect(true);
+                    //}
+                }
+
+                return ApiResult.SetSuccess<string>("邮箱验证码发送成功！", SendMessage);
+            }
+            catch (Exception ex)
+            {
+                return ApiResult.SetException("邮箱验证码发送过程异常！", ex.Message);
             }
         }
     }
